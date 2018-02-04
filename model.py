@@ -32,18 +32,22 @@ class DCGAN(Model):
     def __init__(self, nz, nsf, nvx, batch_size, learning_rate, sess=None):
         self.session(sess)
         opt = tf.train.AdamOptimizer(learning_rate, 0.5)
+        tower_gradsC = []
         tower_gradsG = []
         tower_gradsD = []
         self.lossesG = []
         self.lossesD = []
         self.x_g_list = []
         self.train = tf.placeholder(tf.bool)
+        self.netC = Coder()
         self.netG = Generator()
         self.netD = Discriminator()
 
         self.build_model(nz, nsf, nvx, batch_size, 0)
+        gradsC = opt.compute_gradients(self.lossesG[-1], var_list=self.varsC)
         gradsG = opt.compute_gradients(self.lossesG[-1], var_list=self.varsG)
         gradsD = opt.compute_gradients(self.lossesD[-1], var_list=self.varsD)
+        tower_gradsC.append(gradsC)
         tower_gradsG.append(gradsG)
         tower_gradsD.append(gradsD)
 
@@ -58,6 +62,7 @@ class DCGAN(Model):
         #         tower_gradsG.append(gradsG)
         #         tower_gradsD.append(gradsD)
 
+        self.optC = opt.apply_gradients(average_gradients(tower_gradsC))
         self.optG = opt.apply_gradients(average_gradients(tower_gradsG))
         self.optD = opt.apply_gradients(average_gradients(tower_gradsD))
         self.lossG = tf.reduce_mean(self.lossesG)
@@ -72,8 +77,11 @@ class DCGAN(Model):
 
     def build_model(self, nz, nsf, nvx, batch_size, gpu_idx):
         reuse = False if gpu_idx == 0 else True
-        z = tf.placeholder(tf.float32, [batch_size, nz], 'z'+str(gpu_idx))
+        # z = tf.placeholder(tf.float32, [batch_size, nz], 'z'+str(gpu_idx))
         x = tf.placeholder(tf.float32, [batch_size, nvx, nvx, nvx, 1], 'x'+str(gpu_idx))
+
+        # coder 
+        z = self.netC(x, self.train, nsf, nvx, reuse=reuse)
 
         # generator
         x_g = self.netG(z, self.train, nsf, nvx, reuse=reuse)
@@ -85,6 +93,7 @@ class DCGAN(Model):
 
         if gpu_idx == 0:
             t_vars = tf.trainable_variables()
+            self.varsC = [var for var in t_vars if var.name.startswith('C')]
             self.varsG = [var for var in t_vars if var.name.startswith('G')]
             self.varsD = [var for var in t_vars if var.name.startswith('D')]
 
@@ -102,6 +111,7 @@ class DCGAN(Model):
     def optimize(self, z, x):
         fd = {'z0:0':z, 'x0:0':x, self.train:True}
         # fd = {'z0:0':z[0], 'z1:0':z[1], 'x0:0':x[0], 'x1:0':x[1], self.train:True} # multi-GPU mode
+        self.sess.run(self.optC, feed_dict=fd)
         self.sess.run(self.optD, feed_dict=fd)
         self.sess.run(self.optG, feed_dict=fd)
 
@@ -141,6 +151,32 @@ class DCGANTest(Model):
     def generate(self, z):
         x_g = self.sess.run(self.x_g, feed_dict={'z:0':z, self.train:False})
         return x_g[0, :, :, :, 0] > 0.9
+
+class Coder(object):
+
+    def __call__(self, x, train, nsf, nvx, name="C", reuse=False):
+        with tf.variable_scope(name, reuse=reuse):
+            batch_size, _, _, _, _ = x.get_shape().as_list()
+            nf = 32 # number of filters
+            layer_idx = 1
+
+            x *= binary_mask(x.get_shape())
+
+            u = conv3d(x, [4, 4, 4, 1, nf], 'h{0}'.format(layer_idx), bias=True, stride=1)
+            h = lrelu(u)
+
+            while nsf < nvx:
+                layer_idx += 1
+                u = conv3d(h, [4, 4, 4, nf, nf*2], 'h{0}'.format(layer_idx))
+                h = lrelu(batch_norm(u, train, 'bn{0}'.format(layer_idx)))
+                _, _, _, nvx, nf = h.get_shape().as_list()
+
+            h = tf.reshape(h, [batch_size, -1])
+            h = minibatch_discrimination(h, 300, 50, 'md1')
+
+            layer_idx += 1
+            _, nf = h.get_shape().as_list()
+            return linear(h, [nf, self.nz], 'h{0}'.format(layer_idx), bias=True)
 
 class Generator(object):
 
