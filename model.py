@@ -81,7 +81,7 @@ class DCGAN(Model):
         x = tf.placeholder(tf.float32, [batch_size, nvx, nvx, nvx, 1], 'x'+str(gpu_idx))
 
         # coder 
-        z = self.netC(x, self.train, nsf, nvx, reuse=reuse)
+        z = self.netC(x, nz, self.train, nsf, nvx, reuse=reuse)
 
         # generator
         x_g = self.netG(z, self.train, nsf, nvx, reuse=reuse)
@@ -154,7 +154,7 @@ class DCGANTest(Model):
 
 class Coder(object):
 
-    def __call__(self, x, train, nsf, nvx, name="C", reuse=False):
+    def __call__(self, x, nz, train, nsf, nvx, name="C", reuse=False):
         with tf.variable_scope(name, reuse=reuse):
             batch_size, _, _, _, _ = x.get_shape().as_list()
             nf = 32 # number of filters
@@ -176,7 +176,7 @@ class Coder(object):
 
             layer_idx += 1
             _, nf = h.get_shape().as_list()
-            return linear(h, [nf, self.nz], 'h{0}'.format(layer_idx), bias=True)
+            return linear(h, [nf, nz], 'h{0}'.format(layer_idx), bias=True)
 
 class Generator(object):
 
