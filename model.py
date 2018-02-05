@@ -1,6 +1,7 @@
 import tensorflow as tf
 import util
 from ops import *
+from vb import variational_bayes
 
 class Model(object):
 
@@ -35,6 +36,7 @@ class DCGAN(Model):
         tower_gradsC = []
         tower_gradsG = []
         tower_gradsD = []
+        self.lossesC = []
         self.lossesG = []
         self.lossesD = []
         self.x_g_list = []
@@ -44,7 +46,7 @@ class DCGAN(Model):
         self.netD = Discriminator()
 
         self.build_model(nz, nsf, nvx, batch_size, 0)
-        gradsC = opt.compute_gradients(self.lossesG[-1], var_list=self.varsC)
+        gradsC = opt.compute_gradients(self.lossesC[-1], var_list=self.varsC)
         gradsG = opt.compute_gradients(self.lossesG[-1], var_list=self.varsG)
         gradsD = opt.compute_gradients(self.lossesD[-1], var_list=self.varsD)
         tower_gradsC.append(gradsC)
@@ -65,6 +67,7 @@ class DCGAN(Model):
         self.optC = opt.apply_gradients(average_gradients(tower_gradsC))
         self.optG = opt.apply_gradients(average_gradients(tower_gradsG))
         self.optD = opt.apply_gradients(average_gradients(tower_gradsD))
+        self.lossC = tf.reduce_mean(self.lossesC)
         self.lossG = tf.reduce_mean(self.lossesG)
         self.lossD = tf.reduce_mean(self.lossesD)
         self.x_g = tf.concat(self.x_g_list, 0)
@@ -72,7 +75,7 @@ class DCGAN(Model):
         if sess is None:
             self.initialize()
 
-        variables_to_save = self.varsG + self.varsD + tf.moving_average_variables()
+        variables_to_save = self.varsC + self.varsG + self.varsD + tf.moving_average_variables()
         super(DCGAN, self).__init__(variables_to_save)
 
     def build_model(self, nz, nsf, nvx, batch_size, gpu_idx):
@@ -82,6 +85,8 @@ class DCGAN(Model):
 
         # coder 
         z = self.netC(x, nz, self.train, nsf, nvx, reuse=reuse)
+        z, z_mu, z_log_sigma, loss_z = variational_bayes(
+            h=z, n_code=nz)
 
         # generator
         x_g = self.netG(z, self.train, nsf, nvx, reuse=reuse)
@@ -96,6 +101,11 @@ class DCGAN(Model):
             self.varsC = [var for var in t_vars if var.name.startswith('C')]
             self.varsG = [var for var in t_vars if var.name.startswith('G')]
             self.varsD = [var for var in t_vars if var.name.startswith('D')]
+
+        # coding loss
+        lossC_adv = tf.reduce_mean(loss_z)
+        weight_decayC = tf.add_n([tf.nn.l2_loss(var) for var in self.varsC])
+        self.lossesC.append(lossC_adv + 5e-4*weight_decayC)
 
         # generator loss
         lossG_adv = tf.reduce_mean(sigmoid_kl_with_logits(d_g, 0.8))
