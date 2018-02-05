@@ -84,9 +84,7 @@ class DCGAN(Model):
         x = tf.placeholder(tf.float32, [batch_size, nvx, nvx, nvx, 1], 'x'+str(gpu_idx))
 
         # coder 
-        z = self.netC(x, nz, self.train, nsf, nvx, reuse=reuse)
-        z, z_mu, z_log_sigma, loss_z = variational_bayes(
-            h=z, n_code=nz)
+        z, loss_z = self.netC(x, nz, self.train, nsf, nvx, reuse=reuse)
 
         # generator
         x_g = self.netG(z, self.train, nsf, nvx, reuse=reuse)
@@ -128,12 +126,13 @@ class DCGAN(Model):
     def get_errors(self, z, x):
         fd = {'z0:0':z, 'x0:0':x, self.train:False}
         # fd = {'z0:0':z[0], 'z1:0':z[1], 'x0:0':x[0], 'x1:0':x[1], self.train:False} # multi-GPU mode
+        lossC = self.sess.run(self.lossC, feed_dict=fd)
         lossD = self.sess.run(self.lossD, feed_dict=fd)
         lossG = self.sess.run(self.lossG, feed_dict=fd)
-        return lossD, lossG
+        return lossC, lossD, lossG
 
-    def generate(self, z):
-        x_g = self.sess.run(self.x_g, feed_dict={'z0:0':z, self.train:False})
+    def generate(self, z, x):
+        x_g = self.sess.run(self.x_g, feed_dict={'x0:0':x, 'z0:0':z, self.train:False})
         # x_g = self.sess.run(self.x_g, feed_dict={'z0:0':z[0], 'z1:0':z[1], self.train:False}) # multi-GPU mode
         return x_g[:, :, :, :, 0]
 
@@ -182,11 +181,11 @@ class Coder(object):
                 _, _, _, nvx, nf = h.get_shape().as_list()
 
             h = tf.reshape(h, [batch_size, -1])
-            h = minibatch_discrimination(h, 300, 50, 'md1')
 
             layer_idx += 1
-            _, nf = h.get_shape().as_list()
-            return linear(h, [nf, nz], 'h{0}'.format(layer_idx), bias=True)
+            z, z_mu, z_log_sigma, loss_z = variational_bayes(
+                h=h, n_code=nz)
+            return z, loss_z 
 
 class Generator(object):
 
