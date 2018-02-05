@@ -77,7 +77,7 @@ class DCGAN(Model):
 
     def build_model(self, nz, nsf, nvx, batch_size, gpu_idx):
         reuse = False if gpu_idx == 0 else True
-        # z = tf.placeholder(tf.float32, [batch_size, nz], 'z'+str(gpu_idx))
+        z = tf.placeholder(tf.float32, [batch_size, nz], 'z'+str(gpu_idx))
         x = tf.placeholder(tf.float32, [batch_size, nvx, nvx, nvx, 1], 'x'+str(gpu_idx))
 
         # coder 
