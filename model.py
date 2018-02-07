@@ -170,12 +170,13 @@ class Coder(object):
             layer_idx = 1
 
             x *= binary_mask(x.get_shape())
+            '''
             x = tf.cond(
                     train,
                     lambda: tf.multiply(
                         x, tf.cast(tf.random_uniform(shape=tf.shape(x), minval=0, maxval=1, dtype=tf.int32), tf.float32)),
                     lambda: x)
-
+            '''
             u = conv3d(x, [4, 4, 4, 1, nf], 'h{0}'.format(layer_idx), bias=True, stride=1)
             h = lrelu(u)
 
