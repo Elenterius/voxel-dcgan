@@ -82,6 +82,7 @@ class DCGAN(Model):
         reuse = False if gpu_idx == 0 else True
         z = tf.placeholder(tf.float32, [batch_size, nz], 'z'+str(gpu_idx))
         x = tf.placeholder(tf.float32, [batch_size, nvx, nvx, nvx, 1], 'x'+str(gpu_idx))
+        t = tf.placeholder(tf.float32, [batch_size, nvx, nvx, nvx, 1], 't'+str(gpu_idx))
 
         # coder 
         z, loss_z = self.netC(x, nz, self.train, nsf, nvx, reuse=reuse)
@@ -92,7 +93,7 @@ class DCGAN(Model):
 
         # discriminator
         d_g = self.netD(x_g, self.train, nsf, nvx, reuse=reuse)
-        d_r = self.netD(x, self.train, nsf, nvx, reuse=True)
+        d_r = self.netD(t, self.train, nsf, nvx, reuse=True)
 
         if gpu_idx == 0:
             t_vars = tf.trainable_variables()
@@ -116,15 +117,15 @@ class DCGAN(Model):
         weight_decayD = tf.add_n([tf.nn.l2_loss(var) for var in self.varsD])
         self.lossesD.append(lossD_real + lossD_fake + 5e-4*weight_decayD)
 
-    def optimize(self, z, x):
-        fd = {'z0:0':z, 'x0:0':x, self.train:True}
+    def optimize(self, z, x, t):
+        fd = {'z0:0':z, 'x0:0':x, 't0:0':t, self.train:True}
         # fd = {'z0:0':z[0], 'z1:0':z[1], 'x0:0':x[0], 'x1:0':x[1], self.train:True} # multi-GPU mode
         self.sess.run(self.optC, feed_dict=fd)
         self.sess.run(self.optD, feed_dict=fd)
         self.sess.run(self.optG, feed_dict=fd)
 
-    def get_errors(self, z, x):
-        fd = {'z0:0':z, 'x0:0':x, self.train:False}
+    def get_errors(self, z, x, t):
+        fd = {'z0:0':z, 'x0:0':x, 't0:0':t, self.train:False}
         # fd = {'z0:0':z[0], 'z1:0':z[1], 'x0:0':x[0], 'x1:0':x[1], self.train:False} # multi-GPU mode
         lossC = self.sess.run(self.lossC, feed_dict=fd)
         lossD = self.sess.run(self.lossD, feed_dict=fd)
