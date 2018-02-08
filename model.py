@@ -236,7 +236,7 @@ class Discriminator(object):
                 _, _, _, nvx, nf = h.get_shape().as_list()
 
             h = tf.reshape(h, [batch_size, -1])
-            h = minibatch_discrimination(h, 300, 50, 'md1')
+            h = minibatch_discrimination(h, 30, 5, 'md1')
 
             layer_idx += 1
             _, nf = h.get_shape().as_list()

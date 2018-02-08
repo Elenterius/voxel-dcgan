@@ -16,6 +16,7 @@ class Dataset:
         np.random.shuffle(self.examples_i)
         np.random.seed(seed)
         np.random.shuffle(self.examples_o)
+        import ipdb; ipdb.set_trace()
         print "dataset path for input:", path_i
         print "dataset path for target:", path_o
         print "number of examples:", self.num_examples
@@ -24,7 +25,7 @@ class Dataset:
         start = self.index_in_epoch
         self.index_in_epoch += batch_size
 
-        if self.index_in_epoch > self.num_examples_i:
+        if self.index_in_epoch > self.num_examples:
             seed = np.random.randint(300)
             np.random.seed(seed)
             np.random.shuffle(self.examples_i)
@@ -41,5 +42,7 @@ class Dataset:
         data_i = []
         data_o = []
         for fname in self.examples_i[start:end]:
-            data.append(util.read_binvox(fname))
+            data_i.append(util.read_binvox(fname))
+        for fname in self.examples_o[start:end]:
+            data_o.append(util.read_binvox(fname))
         return np.array(data_i), np.array(data_o)
