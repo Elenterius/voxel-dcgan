@@ -8,15 +8,16 @@ class Dataset:
 
     def __init__(self, path_i, path_o):
         self.index_in_epoch = 0
-        self.examples_i = np.array(glob.glob(path_i))
-        self.examples_o = np.array(glob.glob(path_o))
+        [self.examples_i, self.examples_o] = [glob.glob(e) for e in [path_i, path_o]]
+        # self.examples_i = np.array(glob.glob(path_i))
+        # self.examples_o = np.array(glob.glob(path_o))
         self.num_examples = len(self.examples_i)
         seed = np.random.randint(300)
         np.random.seed(seed)
         np.random.shuffle(self.examples_i)
         np.random.seed(seed)
         np.random.shuffle(self.examples_o)
-        import ipdb; ipdb.set_trace()
+        # import ipdb; ipdb.set_trace()
         print "dataset path for input:", path_i
         print "dataset path for target:", path_o
         print "number of examples:", self.num_examples

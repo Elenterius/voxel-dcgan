@@ -178,7 +178,7 @@ class Coder(object):
                         x, tf.cast(tf.random_uniform(shape=tf.shape(x), minval=0, maxval=1, dtype=tf.int32), tf.float32)),
                     lambda: x)
             '''
-            u = conv3d(x, [5, 5, 5, 1, nf], 'h{0}'.format(layer_idx), bias=True, stride=3)
+            u = conv3d(x, [3, 3, 3, 1, nf], 'h{0}'.format(layer_idx), bias=True, stride=1)
             h = lrelu(u)
 
             while nsf < nvx:
@@ -199,7 +199,7 @@ class Generator(object):
     def __call__(self, z, train, nsf, nvx, name="G", reuse=False):
         with tf.variable_scope(name, reuse=reuse):
             batch_size, nz = z.get_shape().as_list()
-            nf = 256 # number of filters
+            nf = 32 # number of filters
             layer_idx = 1
 
             u = linear(z, [nz, nsf*nsf*nsf*nf], 'h{0}'.format(layer_idx))
@@ -213,7 +213,7 @@ class Generator(object):
                 _, _, _, nsf, nf = h.get_shape().as_list()
 
             layer_idx += 1
-            u = deconv3d(h, [5, 5, 5, 1, nf], [batch_size, nvx, nvx, nvx, 1], 'h{0}'.format(layer_idx), bias=True, stride=3)
+            u = deconv3d(h, [3, 3, 3, 1, nf], [batch_size, nvx, nvx, nvx, 1], 'h{0}'.format(layer_idx), bias=True, stride=1)
             return tf.nn.sigmoid(u)
 
 class Discriminator(object):
@@ -226,7 +226,7 @@ class Discriminator(object):
 
             x *= binary_mask(x.get_shape())
 
-            u = conv3d(x, [5, 5, 5, 1, nf], 'h{0}'.format(layer_idx), bias=True, stride=3)
+            u = conv3d(x, [3, 3, 3, 1, nf], 'h{0}'.format(layer_idx), bias=True, stride=1)
             h = lrelu(u)
 
             while nsf < nvx:
