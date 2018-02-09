@@ -83,6 +83,8 @@ class DCGAN(Model):
         z = tf.placeholder(tf.float32, [batch_size, nz], 'z'+str(gpu_idx))
         x = tf.placeholder(tf.float32, [batch_size, nvx, nvx, nvx, 1], 'x'+str(gpu_idx))
         t = tf.placeholder(tf.float32, [batch_size, nvx, nvx, nvx, 1], 't'+str(gpu_idx))
+        # x = tf.nn.max_pool3d(x, ksize=[1, 4, 4, 4, 1], strides=[1, 4, 4, 4, 1], padding='SAME')
+        # t = tf.nn.max_pool3d(t, ksize=[1, 4, 4, 4, 1], strides=[1, 4, 4, 4, 1], padding='SAME')
 
         # coder 
         z, loss_z = self.netC(x, nz, self.train, nsf, nvx, reuse=reuse)
@@ -236,7 +238,7 @@ class Discriminator(object):
                 _, _, _, nvx, nf = h.get_shape().as_list()
 
             h = tf.reshape(h, [batch_size, -1])
-            h = minibatch_discrimination(h, 30, 5, 'md1')
+            h = minibatch_discrimination(h, 256, 32, 'md1')
 
             layer_idx += 1
             _, nf = h.get_shape().as_list()
