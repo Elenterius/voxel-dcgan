@@ -32,6 +32,7 @@ def plot_voxel(voxel, title=None, save_file = None):
         plt.show()
     else:
         plt.savefig(save_file)
+    plt.close(fig)
 
 def main():
     # check arguments
