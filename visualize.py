@@ -1,43 +1,80 @@
-import tensorflow as tf
+import sys, os, glob
+import random
 import numpy as np
-import util
-import config
-from model import *
+from common.data_io import read_binvox
 
-def interp(l, r, n_samples):
-    return np.array([
-        l + step_i / (n_samples - 1) * (r - l)
-        for step_i in range(n_samples)])
+DEVELOPMENT = os.getenv("ENV") == "DEVELOPMENT"
+if not DEVELOPMENT:
+    import matplotlib
+    matplotlib.use('Agg')
 
-def make_latent_manifold(corners, n_samples):
-    left = interp(corners[0], corners[1], n_samples)
-    right = interp(corners[2], corners[3], n_samples)
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+plt.style.use("ggplot")
 
-    embedding = []
-    for row_i in range(n_samples):
-        embedding.append(interp(left[row_i], right[row_i], n_samples))
-    return np.vstack(embedding)
+def plot_voxels(in_path, title, out_path):
+    files = glob.glob(in_path + '*.binvox')
+    
+    # plot
+    for i, path in enumerate(files):
+        print(path)
+        voxel = read_binvox(path)
 
-netG = Generator()
+        plot_voxel(voxel.astype(np.bool),
+                   '{}{}.png'.format(out_path, i))
 
-z = tf.placeholder(tf.float32, [config.batch_size, config.nz])
-train = tf.placeholder(tf.bool)
+def plot_voxel(voxel, title=None, save_file = None):
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    ax.voxels(voxel, edgecolor='k')
+    # plt.title(title)
+    if save_file is None:
+        plt.show()
+    else:
+        plt.savefig(save_file)
 
-x = netG(z, train, config.nsf, config.nvx)
+def main():
+    # check arguments
+    if len(sys.argv) == 1:
+        print("usage: python visualize.py <file or directory> (<save dir(if you want to save as png)>)")
+        sys.exit()
+    
+    # .binvox paths
+    path = sys.argv[1]
+    if path.split('.')[-1] == 'binvox':
+        files = [path]
+    else:
+        if path[-1] != '/':
+            path += '/'
+        print(path)
+        files = glob.glob(path + '*.binvox')
 
-t_vars = tf.trainable_variables()
-varsG = [var for var in t_vars if var.name.startswith('G')]
+    if len(files) == 0:
+        print("invalid path (.binvox file not found)")
+        sys.exit()
+    else:
+        print("{} files found".format(len(files)))
+    
+    # save directory
+    save_dir = None
+    if len(sys.argv) > 2:
+        save_dir = sys.argv[2]
+        if save_dir[-1] != '/':
+            save_dir += '/'
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # plot
+    for i, path in enumerate(files):
+        # print('plotting {}/{}'.format(i+1, len(files)))
+        voxel = read_binvox(path, fix_coords=False)
+        filename = path.split('/')[-1]
+        print(filename)
 
-saver = tf.train.Saver(varsG + tf.moving_average_variables())
+        if save_dir is None:
+            plot_voxel(voxel.astype(np.bool), filename)
+        else:
+            plot_voxel(voxel.astype(np.bool), filename,
+                       '{}{}.png'.format(save_dir, filename))
 
-config_proto = tf.ConfigProto()
-config_proto.gpu_options.allow_growth = True
-
-with tf.Session(config=config_proto) as sess:
-    saver.restore(sess, config.params_path)
-    batch_z = np.random.uniform(-1, 1, [4, config.nz]).astype(np.float32)
-    batch_z = make_latent_manifold(batch_z, 6)
-    batch_z = batch_z[:config.batch_size,:]
-    x_g = sess.run(x, feed_dict={z:batch_z, train:False})
-    for i, data in enumerate(x_g):
-        util.save_binvox("out/{0}.binvox".format(i), data[:, :, :, 0] > 0.9)
+if __name__=="__main__":
+    main()
